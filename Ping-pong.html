@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title id="gameTitle">Ретро 4-битный Пинг-Понг для всех</title> <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        /* Сброс стилей и базовая настройка для резиновости */
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center; /* Центрирует содержимое по вертикали */
+            align-items: center; /* Центрирует содержимое по горизонтали */
+            min-height: 100vh; /* Минимальная высота на весь экран */
+            background-color: #000000; /* Чёрный фон */
+            font-family: 'Press Start 2P', cursive; /* Если есть, будет пиксельный шрифт, а нет — ничего страшного */
+            color: var(--primary-color, #00FF00); /* Зелёный по умолчанию, теперь из CSS переменных */
+            /* Правильное сглаживание пикселей для всех браузеров */
+            image-rendering: optimizeSpeed;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -o-crisp-edges;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            box-sizing: border-box; /* Убедимся, что padding и border включены в общую ширину/высоту */
+        }
+
+        /* Основной контейнер для канваса, чтобы держать пропорции */
+        .game-container {
+            position: relative;
+            width: 90vw; /* Занимаем 90% ширины вьюпорта */
+            max-width: 800px; /* Максимальная ширина для больших экранов */
+            
+            /* Замена padding-bottom для соотношения сторон: */
+            aspect-ratio: 4 / 3; /* 320 / 240 = 4 / 3. Современный и чистый способ. */
+            height: auto; /* Высота будет определяться по aspect-ratio */
+            
+            /* Ограничение максимальной высоты, чтобы элементы не выталкивались */
+            max-height: calc(100vh - 180px); /* 100vh минус примерно высота счета, инфо и отступов */
+
+            overflow: hidden;
+            border: 2px solid var(--primary-color, #00FF00); /* Зелёная рамка */
+            box-shadow: 0 0 15px var(--primary-color, #00FF00); /* Типа светится */
+            background-color: #000000; /* Внутри чёрно */
+            margin: 20px auto; /* Отступы сверху/снизу и горизонтальное центрирование */
+            transition: transform 0.1s ease-out; /* Плавное изменение трансформации */
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            /* image-rendering уже задан на body, наследуется */
+        }
+        /* Счёт */
+        .score {
+            margin-bottom: 20px; /* Отступ от канваса */
+            font-size: clamp(24px, 6vw, 48px); /* Адаптивный размер шрифта */
+            text-align: center;
+            width: 100%; /* Занимает всю ширину */
+            text-shadow: 2px 2px #000000;
+            box-sizing: border-box; /* Важно для адаптивного дизайна */
+            padding: 0 10px; /* Небольшие горизонтальные отступы */
+        }
+        /* Информация для игроков */
+        .info {
+            font-size: clamp(16px, 4vw, 24px); /* Адаптивный размер шрифта */
+            color: var(--primary-color, #00FF00);
+            text-align: center;
+            width: 100%; /* Занимает всю ширину */
+            padding: 10px; /* Отступы */
+            box-sizing: border-box; /* Важно для адаптивного дизайна */
+        }
+
+        /* Кнопка START/RESTART */
+        #startButton, #settingsButton {
+            position: absolute; /* Относительно game-container */
+            background-color: #000000; /* Чёрный фон */
+            color: var(--primary-color, #00FF00); /* Зелёный текст */
+            border: 2px solid var(--primary-color, #00FF00); /* Зелёная рамка */
+            padding: 15px 30px;
+            font-size: clamp(18px, 5vw, 32px); /* Адаптивный размер шрифта */
+            cursor: pointer;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 0 10px var(--primary-color, #00FF00);
+            transition: background-color 0.1s, color 0.1s;
+            z-index: 10;
+        }
+        #startButton {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%); /* Центрируем кнопку START */
+        }
+        #settingsButton {
+            top: 20px; /* Сверху справа */
+            right: 20px;
+            font-size: clamp(12px, 3vw, 18px); /* Меньше для иконки/текста */
+            padding: 5px 10px;
+            letter-spacing: normal;
+            text-transform: none;
+            z-index: 11; /* Выше чем START */
+        }
+
+        #startButton:hover, #settingsButton:hover {
+            background-color: var(--primary-color, #00FF00);
+            color: #000000;
+        }
+
+        /* Панель настроек и результатов */
+        #settingsPanel, #resultsPanel {
+            position: fixed; /* Фиксировано, чтобы быть поверх всего */
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.9); /* Полупрозрачный чёрный фон */
+            color: var(--primary-color, #00FF00);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20; /* Поверх всего */
+            display: none; /* Скрыта по умолчанию */
+            box-sizing: border-box;
+            padding: 20px; /* Внутренние отступы */
+        }
+        #settingsPanel h2, #resultsPanel h2 {
+            font-size: clamp(28px, 8vw, 40px);
+            margin-bottom: 30px;
+            text-shadow: 2px 2px #000000;
+            text-align: center;
+        }
+        #settingsPanel div, #resultsPanel div {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        #resultsPanel p {
+            font-size: clamp(20px, 6vw, 28px);
+            margin-bottom: 15px;
+            text-shadow: 1px 1px #000000;
+        }
+        #settingsPanel label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: clamp(18px, 5vw, 24px);
+            text-shadow: 1px 1px #000000;
+        }
+        #settingsPanel select, #settingsPanel button, #resultsPanel button, #settingsPanel input[type="checkbox"] {
+            background-color: #000000;
+            color: var(--primary-color, #00FF00);
+            border: 2px solid var(--primary-color, #00FF00);
+            padding: 10px 20px;
+            font-size: clamp(14px, 4vw, 20px);
+            cursor: pointer;
+            box-shadow: 0 0 5px var(--primary-color, #00FF00);
+            text-transform: uppercase;
+            appearance: none; /* Убираем стандартные стили select и checkbox */
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            max-width: 90%; /* Ограничение ширины для маленьких экранов */
+        }
+        #settingsPanel select {
+            background-image: linear-gradient(45deg, transparent 50%, var(--primary-color, #00FF00) 50%),
+                              linear-gradient(135deg, var(--primary-color, #00FF00) 50%, transparent 50%);
+            background-position: calc(100% - 15px) calc(1em + 2px), calc(100% - 10px) calc(1em + 2px);
+            background-size: 5px 5px, 5px 5px;
+            background-repeat: no-repeat;
+        }
+        #settingsPanel input[type="checkbox"] {
+            width: 30px; /* Размер чекбокса */
+            height: 30px;
+            vertical-align: middle;
+            position: relative;
+            border-radius: 4px; /* Слегка закругляем углы */
+            margin-left: 10px;
+            display: inline-block; /* Чтобы был в одну строку с лейблом */
+        }
+        #settingsPanel input[type="checkbox"]:checked {
+            background-color: var(--primary-color, #00FF00); /* Цвет при чеке */
+        }
+        #settingsPanel input[type="checkbox"]:checked::after {
+            content: '';
+            position: absolute;
+            top: 4px;
+            left: 8px;
+            width: 8px;
+            height: 15px;
+            border: solid #000000; /* Цвет галочки */
+            border-width: 0 3px 3px 0;
+            transform: rotate(45deg);
+        }
+
+        #settingsPanel select:focus, #settingsPanel button:focus, #resultsPanel button:focus, #settingsPanel input[type="checkbox"]:focus {
+            outline: none;
+            box-shadow: 0 0 10px var(--primary-color, #00FF00);
+        }
+        #settingsPanel button, #resultsPanel button {
+            margin-top: 30px;
+        }
+        /* Адаптивные шрифты для настроек и результатов (дополнительные медиа-запросы для тонкой настройки) */
+        @media (max-width: 600px) {
+            .score { font-size: clamp(20px, 5vw, 32px); }
+            .info { font-size: clamp(14px, 3.5vw, 18px); }
+            #startButton { font-size: clamp(16px, 4vw, 24px); padding: 8px 15px; }
+            #settingsPanel h2, #resultsPanel h2 { font-size: clamp(24px, 7vw, 32px); }
+            #settingsPanel label { font-size: clamp(16px, 4vw, 20px); }
+            #resultsPanel p { font-size: clamp(16px, 4vw, 20px); }
+            #settingsPanel select, #settingsPanel button, #resultsPanel button, #settingsPanel input[type="checkbox"] { font-size: clamp(12px, 3vw, 16px); padding: 6px 12px; }
+            #settingsPanel input[type="checkbox"] { width: 24px; height: 24px; } /* Меньше чекбокс */
+            #settingsPanel input[type="checkbox"]:checked::after { top: 3px; left: 6px; width: 6px; height: 12px; }
+            #settingsButton {
+                font-size: clamp(10px, 2.5vw, 14px);
+                padding: 3px 8px;
+                top: 10px;
+                right: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="score" id="scoreDisplay">0 - 0</div>
+    <div class="game-container">
+        <canvas id="gameCanvas" width="320" height="240"></canvas>
+        <div id="startButton">СТАРТ</div>
+        <div id="settingsButton">НАСТРОЙКИ</div>
+    </div>
+    <div class="info" id="gameInfo">
+        Используй W/S для движения.
+    </div>
+
+    <div id="settingsPanel">
+        <h2 id="settingsTitle">Настройки</h2>
+        <div>
+            <label for="maxScoreSelect" id="maxScoreLabel">Победа до:</label>
+            <select id="maxScoreSelect">
+                <option value="5">5 очков</option>
+                <option value="10" selected>10 очков</option>
+                <option value="15">15 очков</option>
+            </select>
+        </div>
+        <div>
+            <label for="difficultySelect" id="difficultyLabel">Сложность:</label>
+            <select id="difficultySelect">
+                <option value="easy" id="difficultyEasy">Легко</option>
+                <option value="normal" selected id="difficultyNormal">Нормально</option>
+                <option value="hard" id="difficultyHard">Тяжело</option>
+                <option value="insane" id="difficultyInsane">Невероятный</option>
+            </select>
+        </div>
+        <div>
+            <label for="themeSelect" id="themeLabel">Тема оформления:</label>
+            <select id="themeSelect">
+                <option value="green" selected id="themeGreen">Зеленый (По умолчанию)</option>
+                <option value="blue" id="themeBlue">Синий</option>
+                <option value="red" id="themeRed">Красный</option>
+                <option value="yellow" id="themeYellow">Желтый</option>
+                <option value="bw" id="themeBW">Ч/Б</option>
+                <option value="purple" id="themePurple">Фиолетовый</option>
+            </select>
+        </div>
+        <div>
+            <label for="languageSelect" id="languageLabel">Язык:</label>
+            <select id="languageSelect">
+                <option value="ru">Русский</option>
+                <option value="en">English</option>
+                </select>
+        </div>
+        
+        <div>
+            <label for="threeDModeCheckbox" id="threeDModeLabel">3D Режим:</label>
+            <input type="checkbox" id="threeDModeCheckbox">
+        </div>
+        
+        <button id="saveSettingsButton">СОХРАНИТЬ</button>
+    </div>
+
+    <div id="resultsPanel">
+        <h2 id="gameSummaryTitle">Итоги игры</h2>
+        <div>
+            <p id="gameDuration"></p>
+            <p id="playerHits"></p>
+            <p id="totalRallies"></p>
+        </div>
+        <button id="closeResultsButton">Закрыть</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gameTitle = document.getElementById('gameTitle');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const gameInfo = document.getElementById('gameInfo');
+        const startButton = document.getElementById('startButton');
+        const settingsButton = document.getElementById('settingsButton');
+        const settingsPanel = document.getElementById('settingsPanel');
+        const maxScoreSelect = document.getElementById('maxScoreSelect');
+        const difficultySelect = document.getElementById('difficultySelect');
+        const themeSelect = document.getElementById('themeSelect');
+        const languageSelect = document.getElementById('languageSelect'); // Новый элемент
+        const saveSettingsButton = document.getElementById('saveSettingsButton');
+        const resultsPanel = document.getElementById('resultsPanel');
+        const gameDurationDisplay = document.getElementById('gameDuration');
+        const playerHitsDisplay = document.getElementById('playerHits');
+        const totalRalliesDisplay = document.getElementById('totalRallies');
+        const closeResultsButton = document.getElementById('closeResultsButton');
+
+        // Элемент для 3D режима
+        const threeDModeCheckbox = document.getElementById('threeDModeCheckbox');
+
+
+        // Элементы для обновления текста
+        const textElements = {
+            'gameTitle': gameTitle,
+            'startButton': startButton,
+            'settingsButton': settingsButton,
+            'settingsTitle': document.getElementById('settingsTitle'),
+            'maxScoreLabel': document.getElementById('maxScoreLabel'),
+            'difficultyLabel': document.getElementById('difficultyLabel'),
+            'difficultyEasy': document.getElementById('difficultyEasy'),
+            'difficultyNormal': document.getElementById('difficultyNormal'),
+            'difficultyHard': document.getElementById('difficultyHard'),
+            'difficultyInsane': document.getElementById('difficultyInsane'),
+            'themeLabel': document.getElementById('themeLabel'),
+            'themeGreen': document.getElementById('themeGreen'),
+            'themeBlue': document.getElementById('themeBlue'),
+            'themeRed': document.getElementById('themeRed'),
+            'themeYellow': document.getElementById('themeYellow'),
+            'themeBW': document.getElementById('themeBW'),
+            'themePurple': document.getElementById('themePurple'),
+            'languageLabel': document.getElementById('languageLabel'),
+            'saveSettingsButton': saveSettingsButton,
+            'gameSummaryTitle': document.getElementById('gameSummaryTitle'),
+            'closeResultsButton': closeResultsButton,
+            'threeDModeLabel': document.getElementById('threeDModeLabel'), // Новый элемент для 3D
+        };
+
+        // Объекты переводов
+        const translations = {
+            en: {
+                ui: {
+                    title: "Retro 4-bit Ping-Pong for all",
+                    startGame: "START",
+                    playAgain: "PLAY AGAIN",
+                    settings: "SETTINGS",
+                    moveInstructionsDesktop: "Use W/S to move.",
+                    moveInstructionsTouch: "Tap/drag left side to move. Or simply drag your finger along the paddle.",
+                    settingsTitle: "Settings",
+                    maxScoreLabel: "Win up to:",
+                    difficultyLabel: "Difficulty:",
+                    easy: "Easy",
+                    normal: "Normal",
+                    hard: "Hard",
+                    insane: "Insane",
+                    themeLabel: "Theme:",
+                    green: "Green (Default)",
+                    blue: "Blue",
+                    red: "Red",
+                    yellow: "Yellow",
+                    bw: "B/W",
+                    purple: "Purple",
+                    saveSettings: "SAVE",
+                    gameSummaryTitle: "Game Summary",
+                    gameTime: "Game time: ",
+                    playerHits: "Your hits: ",
+                    totalServes: "Total serves: ",
+                    close: "Close",
+                    language: "Language:",
+                    threeDModeLabel: "3D Mode:", // Новый перевод
+                },
+                game: {
+                    pressStart: "PRESS START",
+                    pressAgain: "PRESS AGAIN",
+                    youWin: "YOU WIN!",
+                    aiWins: "AI WINS!"
+                }
+            },
+            ru: {
+                ui: {
+                    title: "Ретро 4-битный Пинг-Понг для всех",
+                    startGame: "СТАРТ",
+                    playAgain: "ИГРАТЬ СНОВА",
+                    settings: "НАСТРОЙКИ",
+                    moveInstructionsDesktop: "Используй W/S для движения.",
+                    moveInstructionsTouch: "Коснись левой стороны экрана сверху/снизу для движения. Или просто веди пальцем по лопатке.",
+                    settingsTitle: "Настройки",
+                    maxScoreLabel: "Победа до:",
+                    difficultyLabel: "Сложность:",
+                    easy: "Легко",
+                    normal: "Нормально",
+                    hard: "Тяжело",
+                    insane: "Невероятный",
+                    themeLabel: "Тема оформления:",
+                    green: "Зеленый (По умолчанию)",
+                    blue: "Синий",
+                    red: "Красный",
+                    yellow: "Желтый",
+                    bw: "Ч/Б",
+                    purple: "Фиолетовый",
+                    saveSettings: "СОХРАНИТЬ",
+                    gameSummaryTitle: "Итоги игры",
+                    gameTime: "Время игры: ",
+                    playerHits: "Твои удары: ",
+                    totalServes: "Всего подач: ",
+                    close: "Закрыть",
+                    language: "Язык:",
+                    threeDModeLabel: "3D Режим:", // Новый перевод
+                },
+                game: {
+                    pressStart: "ЖМИ СТАРТ",
+                    pressAgain: "ЖМИ СНОВА",
+                    youWin: "ТЫ ПОБЕДИЛ!",
+                    aiWins: "КОМП ПОБЕДИЛ!"
+                }
+            }
+        };
+
+        // Цвета (будут меняться)
+        let PALETTE_PRIMARY = '#00FF00';
+        let PALETTE_SECONDARY = '#000000';
+
+        // Карты тем оформления
+        const themes = {
+            'green': { primary: '#00FF00', secondary: '#000000' },
+            'blue': { primary: '#00FFFF', secondary: '#000000' }, // Cyan
+            'red': { primary: '#FF0000', secondary: '#000000' },
+            'yellow': { primary: '#FFFF00', secondary: '#000000' },
+            'bw': { primary: '#FFFFFF', secondary: '#000000' }, // Black & White
+            'purple': { primary: '#FF00FF', secondary: '#000000' } // Magenta
+        };
+
+        // Игровые параметры (в "игровых" пикселях 320x240)
+        const PADDLE_WIDTH = 8;
+        const PADDLE_HEIGHT = 40;
+        const BALL_SIZE = 8;
+        const PADDLE_SPEED_BASE = 4;
+        
+        // Параметры скорости мяча для плавности
+        const BALL_SPEED_INITIAL_BASE = 2.5;
+        const MAX_BALL_SPEED = 5;
+        const BALL_SPEED_INCREASE_FACTOR = 1.02;
+
+        // Настройки игры
+        let maxScore = 10;
+        let difficulty = 'normal';
+        let currentTheme = 'green';
+        let currentLang = 'ru'; // По умолчанию русский
+
+        // Параметры сложности (скорость ИИ, задержка реакции)
+        const difficultySettings = {
+            'easy': { aiSpeedFactor: 0.5, aiReactionDelayFrames: 15 },
+            'normal': { aiSpeedFactor: 0.7, aiReactionDelayFrames: 8 },
+            'hard': { aiSpeedFactor: 0.9, aiReactionDelayFrames: 3 },
+            'insane': { aiSpeedFactor: 1.0, aiReactionDelayFrames: 0 }
+        };
+        let aiReactionCounter = 0;
+        let aiTargetY = (canvas.height - PADDLE_HEIGHT) / 2; // Цель для ИИ
+
+        // Состояние игры
+        let playerPaddleY = (canvas.height - PADDLE_HEIGHT) / 2; // Левая ракетка (игрока по умолчанию)
+        let aiPaddleY = (canvas.height - PADDLE_HEIGHT) / 2;     // Правая ракетка (ИИ по умолчанию)
+        let ballX = canvas.width / 2;
+        let ballY = canvas.height / 2;
+        let ballDx = BALL_SPEED_INITIAL_BASE;
+        let ballDy = BALL_SPEED_INITIAL_BASE;
+        let playerScore = 0; // Очки игрока
+        let aiScore = 0;     // Очки ИИ
+
+        let keyPressed = {
+            w: false,
+            s: false
+        };
+
+        let lastTime = 0;
+        let gameState = 'paused'; // Изначально игра на паузе
+
+        // Переменные для статистики
+        let gameStartTime = 0;
+        let gameEndTime = 0;
+        let playerPaddleHits = 0; // Сколько раз игрок отбил мяч
+
+        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+        // --- Переменные для 3D режима ---
+        let enable3DMode = false;
+
+        // --- Функции для интернационализации ---
+        function updateTextContent() {
+            const lang = translations[currentLang];
+            if (!lang) {
+                console.error('Переводы для языка не найдены:', currentLang);
+                return;
+            }
+            
+            // Обновляем заголовок страницы
+            gameTitle.innerText = lang.ui.title;
+
+            // Обновляем статический текст
+            for (const key in textElements) {
+                if (textElements[key] && lang.ui[key]) {
+                    textElements[key].innerText = lang.ui[key];
+                }
+            }
+
+            // Обновляем специфические тексты
+            startButton.innerText = lang.ui.startGame; // Initial state
+            settingsButton.innerText = lang.ui.settings;
+            
+            // Текст для инфо-панели
+            if (isTouchDevice) {
+                gameInfo.innerText = lang.ui.moveInstructionsTouch;
+            } else {
+                gameInfo.innerText = lang.ui.moveInstructionsDesktop;
+            }
+            
+            // Опции для селекторов (т.к. у них свои специфические тексты)
+            document.getElementById('maxScoreLabel').innerText = lang.ui.maxScoreLabel;
+            // Для опций "очки"
+            maxScoreSelect.options[0].innerText = `5 ${lang.ui.maxScoreLabel.split(' ')[1] || ''}`; // '5 очков' / '5 points'
+            maxScoreSelect.options[1].innerText = `10 ${lang.ui.maxScoreLabel.split(' ')[1] || ''}`;
+            maxScoreSelect.options[2].innerText = `15 ${lang.ui.maxScoreLabel.split(' ')[1] || ''}`;
+
+
+            document.getElementById('difficultyLabel').innerText = lang.ui.difficultyLabel;
+            document.getElementById('difficultyEasy').innerText = lang.ui.easy;
+            document.getElementById('difficultyNormal').innerText = lang.ui.normal;
+            document.getElementById('difficultyHard').innerText = lang.ui.hard;
+            document.getElementById('difficultyInsane').innerText = lang.ui.insane;
+
+            document.getElementById('themeLabel').innerText = lang.ui.themeLabel;
+            document.getElementById('themeGreen').innerText = lang.ui.green;
+            document.getElementById('themeBlue').innerText = lang.ui.blue;
+            document.getElementById('themeRed').innerText = lang.ui.red;
+            document.getElementById('themeYellow').innerText = lang.ui.yellow;
+            document.getElementById('themeBW').innerText = lang.ui.bw;
+            document.getElementById('themePurple').innerText = lang.ui.purple;
+
+            document.getElementById('languageLabel').innerText = lang.ui.language;
+
+            saveSettingsButton.innerText = lang.ui.saveSettings;
+            gameSummaryTitle.innerText = lang.ui.gameSummaryTitle;
+            closeResultsButton.innerText = lang.ui.close;
+
+            // Текст для 3D режима
+            document.getElementById('threeDModeLabel').innerText = lang.ui.threeDModeLabel;
+
+            // Тексты в панели результатов (нужно обновлять динамически при показе, здесь только префиксы)
+            // gameDurationDisplay.innerText = lang.ui.gameTime + '...'; // Это будет обновляться в showResults
+            // playerHitsDisplay.innerText = lang.ui.playerHits + '...';
+            // totalRalliesDisplay.innerText = lang.ui.totalServes + '...';
+        }
+
+        // Загрузка настроек из localStorage
+        function loadSettings() {
+            const savedMaxScore = localStorage.getItem('pongMaxScore');
+            if (savedMaxScore) {
+                maxScore = parseInt(savedMaxScore);
+                maxScoreSelect.value = savedMaxScore;
+            }
+            const savedDifficulty = localStorage.getItem('pongDifficulty');
+            if (savedDifficulty) {
+                difficulty = savedDifficulty;
+                difficultySelect.value = savedDifficulty;
+            }
+            const savedTheme = localStorage.getItem('pongTheme');
+            if (savedTheme) {
+                currentTheme = savedTheme;
+                themeSelect.value = savedTheme;
+            }
+            const savedLang = localStorage.getItem('pongLanguage'); // Загружаем язык
+            if (savedLang && translations[savedLang]) {
+                currentLang = savedLang;
+                languageSelect.value = savedLang;
+            } else { // Определяем язык по умолчанию из браузера, если не сохранено
+                const browserLang = navigator.language.split('-')[0]; // "en-US" -> "en"
+                if (translations[browserLang]) {
+                    currentLang = browserLang;
+                    languageSelect.value = browserLang;
+                }
+            }
+
+            // Загрузка 3D режима
+            enable3DMode = localStorage.getItem('pong3DMode') === 'true';
+            threeDModeCheckbox.checked = enable3DMode;
+
+            applyTheme(currentTheme); // Применяем тему сразу
+            updateTextContent(); // Обновляем весь текст после загрузки языка
+        }
+
+        // Применение настроек
+        function applySettings() {
+            maxScore = parseInt(maxScoreSelect.value);
+            difficulty = difficultySelect.value;
+            currentTheme = themeSelect.value;
+            currentLang = languageSelect.value; // Сохраняем выбранный язык
+
+            // Сохраняем 3D режим
+            enable3DMode = threeDModeCheckbox.checked;
+            localStorage.setItem('pong3DMode', enable3DMode);
+
+            localStorage.setItem('pongMaxScore', maxScore);
+            localStorage.setItem('pongDifficulty', difficulty);
+            localStorage.setItem('pongTheme', currentTheme);
+            localStorage.setItem('pongLanguage', currentLang); // Сохраняем язык
+            
+
+            applyTheme(currentTheme);
+            updateTextContent(); // Обновляем текст после сохранения
+            settingsPanel.style.display = 'none'; // Скрываем панель настроек
+            draw(); // Перерисовываем сразу, чтобы применить тему и 3D режим
+        }
+
+        // Применение темы оформления
+        function applyTheme(themeName) {
+            const theme = themes[themeName];
+            if (theme) {
+                PALETTE_PRIMARY = theme.primary;
+                PALETTE_SECONDARY = theme.secondary;
+                // Обновляем CSS переменные, чтобы CSS-элементы тоже меняли цвет
+                document.documentElement.style.setProperty('--primary-color', theme.primary);
+            }
+        }
+
+        // Игровой цикл
+        function gameLoop(currentTime) {
+            const deltaTime = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
+
+            if (gameState === 'playing') {
+                update(deltaTime);
+            }
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Сброс мяча
+        function resetBall() {
+            ballX = canvas.width / 2;
+            ballY = canvas.height / 2;
+            ballDx = (Math.random() > 0.5 ? 1 : -1) * BALL_SPEED_INITIAL_BASE;
+            ballDy = (Math.random() > 0.5 ? 1 : -1) * BALL_SPEED_INITIAL_BASE;
+            // Убедимся, что Dy не слишком мало, чтобы мяч двигался по диагонали
+            if (Math.abs(ballDy) < BALL_SPEED_INITIAL_BASE * 0.5) {
+                 ballDy = (Math.random() > 0.5 ? 1 : -1) * BALL_SPEED_INITIAL_BASE * 0.8;
+            }
+        }
+
+        // Обновление состояния игры
+        function update(deltaTime) {
+            const currentPaddleSpeed = PADDLE_SPEED_BASE * 60 * deltaTime;
+            const currentBallSpeedX = ballDx * 60 * deltaTime;
+            const currentBallSpeedY = ballDy * 60 * deltaTime;
+
+            // Движение игрока
+            if (keyPressed.w && playerPaddleY > 0) {
+                playerPaddleY -= currentPaddleSpeed;
+            }
+            if (keyPressed.s && playerPaddleY < canvas.height - PADDLE_HEIGHT) {
+                playerPaddleY += currentPaddleSpeed;
+            }
+
+            // Движение ИИ
+            const aiDifficulty = difficultySettings[difficulty];
+            aiReactionCounter++;
+            if (aiReactionCounter >= aiDifficulty.aiReactionDelayFrames) {
+                aiTargetY = ballY;
+                aiReactionCounter = 0;
+            }
+            const aiCenter = aiPaddleY + PADDLE_HEIGHT / 2;
+            const aiMovementSpeed = currentPaddleSpeed * aiDifficulty.aiSpeedFactor;
+
+            if (aiCenter < aiTargetY - 10) {
+                aiPaddleY += aiMovementSpeed;
+            } else if (aiCenter > aiTargetY + 10) {
+                aiPaddleY -= aiMovementSpeed;
+            }
+            // Границы для ИИ
+            if (aiPaddleY < 0) aiPaddleY = 0;
+            if (aiPaddleY > canvas.height - PADDLE_HEIGHT) aiPaddleY = canvas.height - PADDLE_HEIGHT;
+
+
+            // Движение мяча
+            ballX += currentBallSpeedX;
+            ballY += currentBallSpeedY;
+
+            // Столкновения со стенами
+            if (ballY - BALL_SIZE / 2 < 0) {
+                ballY = BALL_SIZE / 2; /* Избегаем застревания */
+                ballDy *= -1;
+            } else if (ballY + BALL_SIZE / 2 > canvas.height) {
+                ballY = canvas.height - BALL_SIZE / 2; /* Избегаем застревания */
+                ballDy *= -1;
+            }
+
+            // Столкновения с лопатками
+            // Левая лопатка (игрока)
+            if (ballX - BALL_SIZE / 2 < PADDLE_WIDTH &&
+                ballY + BALL_SIZE / 2 > playerPaddleY &&
+                ballY - BALL_SIZE / 2 < playerPaddleY + PADDLE_HEIGHT) {
+
+                playerPaddleHits++; // Игрок отбил мяч
+
+                const collidePoint = (ballY - (playerPaddleY + PADDLE_HEIGHT / 2));
+                const normalizedCollidePoint = collidePoint / (PADDLE_HEIGHT / 2);
+                const bounceAngle = normalizedCollidePoint * (Math.PI / 4); // Угол от -45 до 45 градусов
+
+                ballDx = Math.abs(ballDx) * Math.cos(bounceAngle); // Всегда летит вправо
+                ballDy = BALL_SPEED_INITIAL_BASE * Math.sin(bounceAngle);
+                
+                ballDx *= BALL_SPEED_INCREASE_FACTOR; // Ускоряем
+                ballDy *= BALL_SPEED_INCREASE_FACTOR;
+
+                // Ограничиваем скорость мяча
+                if (Math.abs(ballDx) > MAX_BALL_SPEED) {
+                    ballDx = Math.sign(ballDx) * MAX_BALL_SPEED;
+                }
+                if (Math.abs(ballDy) > MAX_BALL_SPEED) {
+                    ballDy = Math.sign(ballDy) * MAX_BALL_SPEED;
+                }
+
+                ballX = PADDLE_WIDTH + BALL_SIZE / 2; // Избегаем застревания внутри лопатки
+            }
+
+            // Правая лопатка (ИИ)
+            if (ballX + BALL_SIZE / 2 > canvas.width - PADDLE_WIDTH &&
+                ballY + BALL_SIZE / 2 > aiPaddleY &&
+                ballY - BALL_SIZE / 2 < aiPaddleY + PADDLE_HEIGHT) {
+
+                const collidePoint = (ballY - (aiPaddleY + PADDLE_HEIGHT / 2));
+                const normalizedCollidePoint = collidePoint / (PADDLE_HEIGHT / 2);
+                const bounceAngle = normalizedCollidePoint * (Math.PI / 4); // Угол от -45 до 45 градусов
+
+                ballDx = -Math.abs(ballDx) * Math.cos(bounceAngle); // Всегда летит влево
+                ballDy = BALL_SPEED_INITIAL_BASE * Math.sin(bounceAngle);
+
+                ballDx *= BALL_SPEED_INCREASE_FACTOR; // Ускоряем
+                ballDy *= BALL_SPEED_INCREASE_FACTOR;
+
+                // Ограничиваем скорость мяча
+                if (Math.abs(ballDx) > MAX_BALL_SPEED) {
+                    ballDx = Math.sign(ballDx) * MAX_BALL_SPEED;
+                }
+                if (Math.abs(ballDy) > MAX_BALL_SPEED) {
+                    ballDy = Math.sign(ballDy) * MAX_BALL_SPEED;
+                }
+
+                ballX = canvas.width - PADDLE_WIDTH - BALL_SIZE / 2; // Избегаем застревания
+            }
+
+            // Подсчёт очков
+            if (ballX < 0) {
+                aiScore++;
+                scoreDisplay.innerText = `${playerScore} - ${aiScore}`;
+                if (aiScore >= maxScore) {
+                    gameState = 'gameOver';
+                    gameEndTime = performance.now();
+                    showResults();
+                }
+                resetBall();
+            } else if (ballX > canvas.width) {
+                playerScore++;
+                scoreDisplay.innerText = `${playerScore} - ${aiScore}`;
+                if (playerScore >= maxScore) {
+                    gameState = 'gameOver';
+                    gameEndTime = performance.now();
+                    showResults();
+                }
+                resetBall();
+            }
+
+            // Перемещаем ракетки в пределах экрана
+            if (playerPaddleY < 0) playerPaddleY = 0;
+            if (playerPaddleY > canvas.height - PADDLE_HEIGHT) playerPaddleY = canvas.height - PADDLE_HEIGHT;
+            if (aiPaddleY < 0) aiPaddleY = 0;
+            if (aiPaddleY > canvas.height - PADDLE_HEIGHT) aiPaddleY = canvas.height - PADDLE_HEIGHT;
+        }
+
+        // Прорисовка
+        function draw() {
+            ctx.fillStyle = PALETTE_SECONDARY;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = PALETTE_PRIMARY;
+
+            // Рисуем 3D перспективное поле, если 3D режим включен
+            if (enable3DMode) {
+                ctx.strokeStyle = PALETTE_PRIMARY;
+                ctx.lineWidth = 2; // Толще линии для поля
+
+                // Определяем "дальние" и "ближние" края трапециевидного поля
+                const fieldTopY = canvas.height * 0.1; // Верх поля (далеко)
+                const fieldBottomY = canvas.height * 0.9; // Низ поля (ближе)
+                const fieldFarWidth = canvas.width * 0.8; // Ширина поля вверху
+                const fieldNearWidth = canvas.width;     // Ширина поля внизу (вся ширина канваса)
+
+                const fieldLeftFarX = (canvas.width - fieldFarWidth) / 2;
+                const fieldRightFarX = fieldLeftFarX + fieldFarWidth;
+
+                const fieldLeftNearX = (canvas.width - fieldNearWidth) / 2; // Это будет 0
+                const fieldRightNearX = fieldLeftNearX + fieldNearWidth;     // Это будет canvas.width
+
+                // Рисуем контур игрового поля как трапецию
+                ctx.beginPath();
+                ctx.moveTo(fieldLeftFarX, fieldTopY); // Верхний левый угол
+                ctx.lineTo(fieldRightFarX, fieldTopY); // Верхний правый угол
+                ctx.lineTo(fieldRightNearX, fieldBottomY); // Нижний правый угол
+                ctx.lineTo(fieldLeftNearX, fieldBottomY); // Нижний левый угол
+                ctx.closePath();
+                ctx.stroke();
+
+                // Рисуем перспективные линии для центрального разделителя
+                ctx.setLineDash([5, 5]); // Пунктирная линия
+                ctx.beginPath();
+                ctx.moveTo(canvas.width / 2, fieldTopY); // Начинаем от центра верхней части поля
+                ctx.lineTo(canvas.width / 2, fieldBottomY); // Заканчиваем в центре нижней части поля
+                ctx.stroke();
+                ctx.setLineDash([]); // Сбрасываем пунктир
+            } else {
+                // Старая 2D центральная линия
+                ctx.strokeStyle = PALETTE_PRIMARY;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(canvas.width / 2, 0);
+                ctx.lineTo(canvas.width / 2, canvas.height);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            ctx.fillStyle = PALETTE_PRIMARY;
+
+            // Рисуем лопатки (без перспективных искажений, для сохранения играбельности)
+            ctx.fillRect(0, playerPaddleY, PADDLE_WIDTH, PADDLE_HEIGHT);
+            ctx.fillRect(canvas.width - PADDLE_WIDTH, aiPaddleY, PADDLE_WIDTH, PADDLE_HEIGHT);
+
+            // Рисуем мяч с масштабированием для 3D режима
+            let currentBallSize = BALL_SIZE;
+            if (enable3DMode) {
+                // Масштабируем мяч в зависимости от его Y позиции (ближе к верху = меньше)
+                // Используем ballY относительно высоты поля (fieldBottomY - fieldTopY)
+                // и прижимаем ballY к этому диапазону для масштабирования.
+                const fieldTopY = canvas.height * 0.1;
+                const fieldBottomY = canvas.height * 0.9;
+                const scaledY = Math.max(fieldTopY, Math.min(fieldBottomY, ballY));
+                const scaleFactor = 0.5 + 0.5 * ((scaledY - fieldTopY) / (fieldBottomY - fieldTopY)); // 0.5 на верху, 1.0 внизу
+                currentBallSize = BALL_SIZE * scaleFactor;
+            }
+            ctx.fillRect(ballX - currentBallSize / 2, ballY - currentBallSize / 2, currentBallSize, currentBallSize);
+
+
+            if (gameState === 'paused' || gameState === 'gameOver') {
+                const lang = translations[currentLang].game;
+                ctx.fillStyle = PALETTE_PRIMARY;
+                ctx.font = '30px "Press Start 2P", cursive';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                if (gameState === 'paused') {
+                    ctx.fillText(lang.pressStart, canvas.width / 2, canvas.height / 2 - 30);
+                } else if (gameState === 'gameOver') {
+                    let message = '';
+                    if (playerScore >= maxScore) {
+                        message = lang.youWin;
+                    } else {
+                        message = lang.aiWins;
+                    }
+                    ctx.fillText(message, canvas.width / 2, canvas.height / 2 - 30);
+                    ctx.fillText(lang.pressAgain, canvas.width / 2, canvas.height / 2 + 30);
+                }
+            }
+        }
+
+        // Показать панель результатов
+        function showResults() {
+            const lang = translations[currentLang].ui;
+            startButton.style.display = 'block';
+            startButton.innerText = lang.playAgain; // "ИГРАТЬ СНОВА" / "PLAY AGAIN"
+            settingsButton.style.display = 'block'; // Показываем кнопку настроек
+            
+            const durationSeconds = ((gameEndTime - gameStartTime) / 1000).toFixed(1);
+            gameDurationDisplay.innerText = `${lang.gameTime}${durationSeconds} сек.`;
+            playerHitsDisplay.innerText = `${lang.playerHits}${playerPaddleHits}`;
+            totalRalliesDisplay.innerText = `${lang.totalServes}${playerScore + aiScore}`; // Общее количество подач = общее количество голов
+            resultsPanel.style.display = 'flex';
+        }
+
+        // Обработчики клавиатуры
+        document.addEventListener('keydown', (e) => {
+            if (gameState === 'playing') {
+                if (e.key === 'w' || e.key === 'W' || e.key === 'ц' || e.key === 'Ц') {
+                    keyPressed.w = true;
+                } else if (e.key === 's' || e.key === 'S' || e.key === 'ы' || e.key === 'Ы') {
+                    keyPressed.s = true;
+                }
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'w' || e.key === 'W' || e.key === 'ц' || e.key === 'Ц') {
+                keyPressed.w = false;
+            } else if (e.key === 's' || e.key === 'S' || e.key === 'ы' || e.key === 'Ы') {
+                keyPressed.s = false;
+            }
+        });
+
+        // Тач-управление (для телефонов/планшетов)
+        if (isTouchDevice) {
+            // gameInfo.innerText обновляется в updateTextContent()
+            
+            let activeTouchId = null;
+
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (gameState === 'playing' && e.touches.length === 1) {
+                    activeTouchId = e.touches[0].identifier;
+                    const rect = canvas.getBoundingClientRect();
+                    const touchYInCanvas = (e.touches[0].clientY - rect.top) * (canvas.height / rect.height);
+                    
+                    playerPaddleY = touchYInCanvas - PADDLE_HEIGHT / 2;
+                    if (playerPaddleY < 0) { playerPaddleY = 0; }
+                    if (playerPaddleY > canvas.height - PADDLE_HEIGHT) { playerPaddleY = canvas.height - PADDLE_HEIGHT; }
+                }
+            });
+
+            canvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                if (gameState === 'playing') {
+                    for (let i = 0; i < e.touches.length; i++) {
+                        if (e.touches[i].identifier === activeTouchId) {
+                            const rect = canvas.getBoundingClientRect();
+                            const touchYInCanvas = (e.touches[i].clientY - rect.top) * (canvas.height / rect.height);
+                            
+                            playerPaddleY = touchYInCanvas - PADDLE_HEIGHT / 2;
+
+                            if (playerPaddleY < 0) { playerPaddleY = 0; }
+                            if (playerPaddleY > canvas.height - PADDLE_HEIGHT) { playerPaddleY = canvas.height - PADDLE_HEIGHT; }
+                            break;
+                        }
+                    }
+                }
+            });
+
+            canvas.addEventListener('touchend', (e) => {
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === activeTouchId) {
+                        activeTouchId = null;
+                        break;
+                    }
+                }
+            });
+        } else {
+            // gameInfo.innerText обновляется в updateTextContent()
+        }
+
+        // Обработчик кнопки СТАРТ
+        startButton.addEventListener('click', () => {
+            if (gameState === 'paused' || gameState === 'gameOver') {
+                playerScore = 0;
+                aiScore = 0;
+                scoreDisplay.innerText = `0 - 0`;
+                resetBall();
+                gameState = 'playing';
+                startButton.style.display = 'none';
+                settingsButton.style.display = 'none'; // Скрываем кнопку настроек при старте игры
+                gameStartTime = performance.now(); // Записываем время начала игры
+                playerPaddleHits = 0; // Обнуляем счётчик ударов
+            }
+        });
+
+        // Обработчик кнопки НАСТРОЙКИ
+        settingsButton.addEventListener('click', () => {
+            settingsPanel.style.display = 'flex'; // Показываем панель
+        });
+
+        // Обработчик кнопки СОХРАНИТЬ НАСТРОЙКИ
+        saveSettingsButton.addEventListener('click', applySettings);
+
+        // Обработчик кнопки закрытия панели результатов
+        closeResultsButton.addEventListener('click', () => {
+            resultsPanel.style.display = 'none';
+            // Текущая логика уже делает кнопку СТАРТ видимой после gameOver
+        });
+
+        // Обработчик изменения языка
+        languageSelect.addEventListener('change', () => {
+            currentLang = languageSelect.value;
+            updateTextContent();
+        });
+
+
+        // Запускаем игру
+        loadSettings(); // Загружаем настройки при старте
+        lastTime = performance.now();
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
