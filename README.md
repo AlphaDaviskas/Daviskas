@@ -11,10 +11,12 @@
  * Управление: Используйте клавиши W/S на клавиатуре или интуитивные сенсорные жесты на мобильных устройствах для управления ракеткой.
  * Игровая статистика: По завершении матча отображается сводка с данными о продолжительности игры, количестве ударов по мячу игроком и общем количестве подач.
  * Постоянные настройки: Все выбранные вами параметры (сложность, тема, максимальный счет, язык и 3D-режим) автоматически сохраняются в локальном хранилище браузера для будущих сессий.
+
 Технологии:
  * HTML5
  * CSS3
  * JavaScript (ES6+)
+
 Как играть:
 Откройте файл Ping-pong.html в любом современном веб-браузере. Используйте W и S для управления ракеткой на компьютере. На мобильных устройствах перетаскивайте палец по левой стороне экрана, чтобы перемещать ракетку.
 
@@ -31,9 +33,11 @@ Key Features:
  * Controls: Use W/S keys on your keyboard or intuitive touch gestures on mobile devices to control your paddle.
  * Game Statistics: After a match concludes, a summary displays game duration, your paddle hits, and total rallies.
  * Persistent Settings: All your chosen preferences (difficulty, theme, max score, language, and 3D mode) are automatically saved in your browser's local storage for future sessions.
+
 Technologies Used:
  * HTML5
  * CSS3
  * JavaScript (ES6+)
+
 How to Play:
 Open the Ping-Pong.html file in any modern web browser. Use W and S keys to control your paddle on desktop. On mobile devices, drag your finger on the left side of the screen to move your paddle.
